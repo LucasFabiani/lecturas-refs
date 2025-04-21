@@ -13,6 +13,7 @@
     }
 
     h1 {
+        margin-top: 0;
       text-align: center;
       margin-bottom: 10px;
     }
@@ -77,8 +78,8 @@
     }
 
     td {
-  height: 120px;
-  font-size: 0.85rem;
+  height: 100px;
+  font-size: 0.55rem;
   word-wrap: break-word; /* Esto permite que el texto se ajuste a la celda */
   white-space: normal;   /* Asegura que el texto pueda romperse */
 }
@@ -195,9 +196,10 @@ async function loadDayCitations(td, year, month, day, lang, weekday) {
   const results = await Promise.all(promises);
   const [fr, ps, sr, gsp] = (weekday === 6) ? results : [...results, null];
   td.innerHTML = `<span class="day">${day}</span>` +
-                 `${fr}<br>${ps}` +
-                 (sr==null ? `<br>${sr}` : '') +
-                 `<br>${gsp}`;
+               `${fr ?? ''}<br>${ps ?? ''}` +
+               (sr ? `<br>${sr}` : '') +
+               (gsp ? `<br>${gsp}` : '');
+
 }
 
 function buildCalendar(year, month, lang) {
