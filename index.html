@@ -196,7 +196,7 @@ async function loadDayCitations(td, year, month, day, lang, weekday) {
   const [fr, ps, sr, gsp] = (weekday === 6) ? results : [...results, null];
   td.innerHTML = `<span class="day">${day}</span>` +
                  `${fr}<br>${ps}` +
-                 (sr ? `<br>${sr}` : '') +
+                 (sr==null ? `<br>${sr}` : '') +
                  `<br>${gsp}`;
 }
 
