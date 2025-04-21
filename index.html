@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Calendario Litúrgico</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f9f9f9;
+      padding: 20px;
+      color: #000000;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    #calendar-title {
+      text-align: center;
+      font-size: 1.4em;
+      font-weight: bold;
+      margin: 20px 0 10px;
+    }
+
+    form {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    select, button {
+      padding: 8px 12px;
+      font-size: 1rem;
+    }
+
+    button {
+      cursor: pointer;
+      background-color: #4CAF50;
+      border: none;
+      color: white;
+      border-radius: 5px;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background-color: #388E3C;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      background: white;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      border-spacing: 0;
+      padding: .5rem;
+    }
+
+    th, td {
+      border: 1px solid #1b1b1b;
+      padding: 6px;
+      vertical-align: top;
+    }
+
+    th {
+      background-color: #800000; /* bordó */
+      color: white;
+      text-align: center;
+    }
+
+    td {
+  height: 120px;
+  font-size: 0.85rem;
+  word-wrap: break-word; /* Esto permite que el texto se ajuste a la celda */
+  white-space: normal;   /* Asegura que el texto pueda romperse */
+}
+
+
+    .day {
+      font-weight: bold;
+      color: #c9c9c9;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .loading {
+      color: gray;
+      font-style: italic;
+    }
+
+    @media print {
+      button, form, h1 {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<h1>Calendario Litúrgico Diario</h1>
+
+<form id="calendar-form">
+  <label for="year">Año:</label>
+  <select id="year"></select>
+
+  <label for="month">Mes:</label>
+  <select id="month">
+    <option value="0">Enero</option>
+    <option value="1">Febrero</option>
+    <option value="2">Marzo</option>
+    <option value="3">Abril</option>
+    <option value="4">Mayo</option>
+    <option value="5">Junio</option>
+    <option value="6">Julio</option>
+    <option value="7">Agosto</option>
+    <option value="8">Septiembre</option>
+    <option value="9">Octubre</option>
+    <option value="10">Noviembre</option>
+    <option value="11">Diciembre</option>
+  </select>
+
+  <button type="submit">Generar calendario</button>
+  <button type="button" onclick="downloadPDF()">Descargar PDF</button>
+</form>
+
+<div id="calendar-wrapper">
+  <div id="calendar-title"></div>
+  <table id="calendar" style="display:none">
+    <thead>
+      <tr>
+        <th>Lun</th><th>Mar</th><th>Mié</th><th>Jue</th><th>Vie</th><th>Sáb</th><th>Dom</th>
+      </tr>
+    </thead>
+    <tbody id="calendar-body"></tbody>
+  </table>
+</div>
+
+<script>
+const monthNames = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+];
+
+const yearSelect = document.getElementById("year");
+for (let y = 2020; y <= 2030; y++) {
+  const option = document.createElement("option");
+  option.value = y;
+  option.textContent = y;
+  if (y === new Date().getFullYear()) option.selected = true;
+  yearSelect.appendChild(option);
+}
+
+document.getElementById("month").value = new Date().getMonth();
+
+document.getElementById("calendar-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const year = parseInt(document.getElementById("year").value);
+  const month = parseInt(document.getElementById("month").value);
+  const lang = 'SP';
+  buildCalendar(year, month, lang);
+});
+
+async function fetchCitation(dateStr, content, lang) {
+  const url = `https://feed.evangelizo.org/v2/reader.php?date=${dateStr}&type=reading_st&content=${content}&lang=${lang}`;
+  try {
+    const res = await fetch(url);
+    return await res.text();
+  } catch {
+    return "Error";
+  }
+}
+
+async function loadDayCitations(td, year, month, day, lang, weekday) {
+  const dateStr = `${year}${(month+1).toString().padStart(2, '0')}${day.toString().padStart(2, '0')}`;
+  td.innerHTML = `<span class="day">${day}</span><span class="loading">Cargando...</span>`;
+  const promises = [
+    fetchCitation(dateStr, "FR", lang),
+    fetchCitation(dateStr, "PS", lang),
+    fetchCitation(dateStr, "GSP", lang),
+  ];
+
+  // Si es domingo (Domingo = día 6 en esta convención)
+  if (weekday === 6) {
+    promises.splice(2, 0, fetchCitation(dateStr, "SR", lang)); // Agrega segunda lectura antes del evangelio
+  }
+
+  const results = await Promise.all(promises);
+  const [fr, ps, sr, gsp] = (weekday === 6) ? results : [...results, null];
+  td.innerHTML = `<span class="day">${day}</span>` +
+                 `${fr}<br>${ps}` +
+                 (sr ? `<br>${sr}` : '') +
+                 `<br>${gsp}`;
+}
+
+function buildCalendar(year, month, lang) {
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDay = (firstDay.getDay() + 6) % 7; // Lunes = 0
+  const totalDays = lastDay.getDate();
+  const tbody = document.getElementById("calendar-body");
+  const table = document.getElementById("calendar");
+  tbody.innerHTML = "";
+  table.style.display = "table";
+
+  // Actualizar título
+  document.getElementById("calendar-title").textContent = `Lecturas ${monthNames[month]} ${year}`;
+
+  let tr = document.createElement("tr");
+  for (let i = 0; i < startDay; i++) {
+    tr.appendChild(document.createElement("td"));
+  }
+
+  for (let day = 1; day <= totalDays; day++) {
+    const td = document.createElement("td");
+    const weekday = (startDay + day - 1) % 7;
+    tr.appendChild(td);
+    loadDayCitations(td, year, month, day, lang, weekday);
+
+    if ((startDay + day) % 7 === 0 || day === totalDays) {
+      tbody.appendChild(tr);
+      tr = document.createElement("tr");
+    }
+  }
+}
+
+function downloadPDF() {
+  const calendar = document.getElementById("calendar-wrapper");
+  html2pdf().from(calendar).set({
+    margin: 0.3,
+    filename: 'calendario_leccionario.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'in', format: 'a5', orientation: 'portrait' }
+  }).save();
+}
+</script>
+
+</body>
+</html>
